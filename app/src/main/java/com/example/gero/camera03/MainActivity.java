@@ -27,8 +27,8 @@ import java.util.Date;
 public class MainActivity extends AppCompatActivity {
 
     private Camera mCamera;
-    private CameraPreview mPreview;
     private static final String TAG = "MainActivity";
+    private Camera.PictureCallback mPicture;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -48,24 +48,60 @@ public class MainActivity extends AppCompatActivity {
         mCamera = getCameraInstance();
 
         // Create our Preview view and set it as the content of our activity.
-        mPreview = new CameraPreview(this, mCamera);
+        CameraPreview mPreview = new CameraPreview(this, mCamera);
         FrameLayout preview = (FrameLayout) findViewById(R.id.surfaceView);
-        preview.addView(mPreview);
+        if (preview != null)
+            preview.addView(mPreview);
 
+        mPicture = new Camera.PictureCallback() {
+
+            @Override
+            public void onPictureTaken(byte[] data, Camera camera) {
+
+                Log.d(TAG, "onPictureTaken called");
+                File pictureFile = getOutputMediaFile(MEDIA_TYPE_IMAGE);
+                Log.d(TAG, "output file: " + pictureFile);
+                if (pictureFile == null) {
+                    Log.d(TAG, "Error creating media file, check storage permissions");
+                    return;
+                }
+
+                try {
+                    FileOutputStream fos = new FileOutputStream(pictureFile);
+                    if (fos == null)
+                        Log.d(TAG, "fos == null");
+                    Log.d(TAG, "writing to fos");
+                    fos.write(data);
+                    Log.d(TAG, "write to fos finished");
+                    fos.close();
+                    Log.d(TAG, "closing fos");
+                } catch (FileNotFoundException e) {
+                    Log.d(TAG, "File not found: " + e.getMessage());
+                } catch (IOException e) {
+                    Log.d(TAG, "Error accessing file: " + e.getMessage());
+                }
+            }
+        };
 
         // Add a listener to the Capture button
         Button captureButton = (Button) findViewById(R.id.buttonCapture);
-        captureButton.setOnClickListener(
-                new View.OnClickListener() {
-                    @Override
-                    public void onClick(View v) {
-                        // get an image from the camera
-                        Log.d(TAG, "onClick called");
-                        mCamera.takePicture(null, null, mPicture);
-                        Log.d(TAG, "onClick - picture taken");
+        if (captureButton != null) {
+            captureButton.setOnClickListener(
+                    new View.OnClickListener() {
+                        @Override
+                        public void onClick(View v) {
+                            // get an image from the camera
+                            Log.d(TAG, "onClick called");
+                            if (mPicture == null)
+                                Log.d(TAG, "mPicture == null");
+                            if (mCamera == null)
+                                Log.d(TAG, "mCamera == null");
+                            mCamera.takePicture(null, null, mPicture);
+                            Log.d(TAG, "onClick - picture taken");
+                        }
                     }
-                }
-        );
+            );
+        }
     }
 
     /**
@@ -77,47 +113,56 @@ public class MainActivity extends AppCompatActivity {
             c = Camera.open(); // attempt to get a Camera instance
         } catch (Exception e) {
             // Camera is not available (in use or does not exist)
+            Log.e(TAG, "getCameraInstance - failed", e);
         }
         return c; // returns null if camera is unavailable
     }
 
 
-    @Override
-    protected void onPause() {
-        super.onPause();
-        releaseCamera();              // release the camera immediately on pause event
-    }
+//    @Override
+//    protected void onPause() {
+//        super.onPause();
+//        releaseCamera();              // release the camera immediately on pause event
+//    }
+//
+//    @Override
+//    protected void onResume() {
+//        super.onResume();
+//        Log.d(TAG, "onResume - getting camera");
+//        mCamera = getCameraInstance();
+//    }
 
-    private void releaseCamera(){
-        if (mCamera != null){
+    private void releaseCamera() {
+        if (mCamera != null) {
+            Log.d(TAG, "releaseCamera called");
             mCamera.release();        // release the camera for other applications
             mCamera = null;
         }
     }
 
-    private Camera.PictureCallback mPicture = new Camera.PictureCallback() {
-
-        @Override
-        public void onPictureTaken(byte[] data, Camera camera) {
-
-            Log.d(TAG, "onPictureTaken called");
-            File pictureFile = getOutputMediaFile(MEDIA_TYPE_IMAGE);
-            if (pictureFile == null){
-                Log.d(TAG, "Error creating media file, check storage permissions");
-                return;
-            }
-
-            try {
-                FileOutputStream fos = new FileOutputStream(pictureFile);
-                fos.write(data);
-                fos.close();
-            } catch (FileNotFoundException e) {
-                Log.d(TAG, "File not found: " + e.getMessage());
-            } catch (IOException e) {
-                Log.d(TAG, "Error accessing file: " + e.getMessage());
-            }
-        }
-    };
+//    private Camera.PictureCallback mPicture = new Camera.PictureCallback() {
+//
+//        @Override
+//        public void onPictureTaken(byte[] data, Camera camera) {
+//
+//            Log.d(TAG, "onPictureTaken called");
+//            File pictureFile = getOutputMediaFile(MEDIA_TYPE_IMAGE);
+//            if (pictureFile == null) {
+//                Log.d(TAG, "Error creating media file, check storage permissions");
+//                return;
+//            }
+//
+//            try {
+//                FileOutputStream fos = new FileOutputStream(pictureFile);
+//                fos.write(data);
+//                fos.close();
+//            } catch (FileNotFoundException e) {
+//                Log.d(TAG, "File not found: " + e.getMessage());
+//            } catch (IOException e) {
+//                Log.d(TAG, "Error accessing file: " + e.getMessage());
+//            }
+//        }
+//    };
 
 
     /* SAVING MEDIA FILES */
@@ -139,17 +184,21 @@ public class MainActivity extends AppCompatActivity {
         // To be safe, you should check that the SDCard is mounted
         // using Environment.getExternalStorageState() before doing this.
 
-        File mediaStorageDir = new File(Environment.getExternalStoragePublicDirectory(
-                Environment.DIRECTORY_PICTURES), "MyCameraApp");
+        Log.d(TAG, "getOutputMediaFile");
+        File mediaStorageDir = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES), "MyCameraApp");
         // This location works best if you want the created images to be shared
         // between applications and persist after your app has been uninstalled.
 
         // Create the storage directory if it does not exist
         if (!mediaStorageDir.exists()) {
+            Log.d(TAG, "!mediaStorageDir.exists()");
             if (!mediaStorageDir.mkdirs()) {
                 Log.d("MyCameraApp", "failed to create directory");
                 return null;
             }
+        } else {
+            Log.d(TAG, "mediaStorageDir=/tmp");
+            mediaStorageDir = new File("/storage/sdcard0/temp");
         }
 
         // Create a media file name
