@@ -60,7 +60,9 @@ public class MainActivity extends AppCompatActivity {
                     @Override
                     public void onClick(View v) {
                         // get an image from the camera
+                        Log.d(TAG, "onClick called");
                         mCamera.takePicture(null, null, mPicture);
+                        Log.d(TAG, "onClick - picture taken");
                     }
                 }
         );
@@ -80,11 +82,25 @@ public class MainActivity extends AppCompatActivity {
     }
 
 
+    @Override
+    protected void onPause() {
+        super.onPause();
+        releaseCamera();              // release the camera immediately on pause event
+    }
+
+    private void releaseCamera(){
+        if (mCamera != null){
+            mCamera.release();        // release the camera for other applications
+            mCamera = null;
+        }
+    }
+
     private Camera.PictureCallback mPicture = new Camera.PictureCallback() {
 
         @Override
         public void onPictureTaken(byte[] data, Camera camera) {
 
+            Log.d(TAG, "onPictureTaken called");
             File pictureFile = getOutputMediaFile(MEDIA_TYPE_IMAGE);
             if (pictureFile == null){
                 Log.d(TAG, "Error creating media file, check storage permissions");
